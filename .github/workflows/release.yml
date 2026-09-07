@@ -1,0 +1,75 @@
+name: Release
+
+# Manual only until the app is notarized — a v* tag must not publish a
+# Gatekeeper-blocked DMG. See docs/releasing.md
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build DMG
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Resolve tag and version
+        id: meta
+        run: |
+          TAG="${{ inputs.tag }}"
+          [ -z "$TAG" ] && TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          if [[ "$TAG" == *-* ]]; then PRERELEASE=true; else PRERELEASE=false; fi
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Import Developer ID certificate
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        uses: apple-actions/import-codesign-certs@v7
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Resolve signing identity
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        run: |
+          IDENTITY="$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/ {print $2; exit}')"
+          [ -n "$IDENTITY" ] || { echo "No Developer ID Application identity found" >&2; exit 1; }
+          echo "CODESIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Build universal DMG
+        env:
+          PORT_HARBOR_VERSION: ${{ steps.meta.outputs.version }}
+          NOTARY_APPLE_ID: ${{ secrets.APPLE_ID }}
+          NOTARY_APP_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: ./scripts/release.sh
+
+      - name: Publish DMG to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Port Harbor ${{ steps.meta.outputs.version }}
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          files: dist/PortHarbor-${{ steps.meta.outputs.version }}.dmg
+          generate_release_notes: true
