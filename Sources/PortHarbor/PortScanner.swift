@@ -4,6 +4,81 @@ struct Listener: Hashable {
     let port: Int
     let pid: Int
     let lsofCommand: String
+    var binds: BindInfo
+}
+
+/// Address families a single (pid, port) is listening on, taken from lsof `n`.
+///
+/// IPv4 `127.0.0.1:4321` and IPv6 `[::1]:4321` are different sockets. Opening
+/// `http://localhost:4321` typically hits IPv6, so an IPv4-only listener needs
+/// `http://127.0.0.1:4321` or the click lands on a sibling process.
+struct BindInfo: Hashable {
+    var ipv4Hosts: Set<String>
+    var ipv6Hosts: Set<String>
+
+    /// Dual-stack loopback — the usual `localhost` case.
+    static let localhost = BindInfo(ipv4Hosts: ["127.0.0.1"], ipv6Hosts: ["::1"])
+
+    var hasIPv4: Bool { !ipv4Hosts.isEmpty }
+    var hasIPv6: Bool { !ipv6Hosts.isEmpty }
+    var isIPv4Only: Bool { hasIPv4 && !hasIPv6 }
+    var isIPv6Only: Bool { hasIPv6 && !hasIPv4 }
+
+    /// Host to put in `http://HOST:port` so the browser hits this socket.
+    var openHost: String {
+        isIPv4Only ? preferredIPv4Literal : "localhost"
+    }
+
+    func httpURL(port: Int) -> String {
+        "http://\(openHost):\(port)"
+    }
+
+    mutating func merge(_ other: BindInfo) {
+        ipv4Hosts.formUnion(other.ipv4Hosts)
+        ipv6Hosts.formUnion(other.ipv6Hosts)
+    }
+
+    /// Classify the host part of an lsof name (`127.0.0.1:3000`, `[::1]:3333`).
+    static func from(lsofName name: String) -> BindInfo {
+        guard let host = LsofFParser.hostFromName(name) else { return .localhost }
+        return from(host: host)
+    }
+
+    static func from(host raw: String) -> BindInfo {
+        let host = raw.lowercased()
+        if host == "localhost" {
+            return .localhost
+        }
+        if host == "*" || host == "0.0.0.0" {
+            return BindInfo(ipv4Hosts: [host], ipv6Hosts: [])
+        }
+
+        let unbracketed: String
+        if host.hasPrefix("["), host.hasSuffix("]"), host.count >= 2 {
+            unbracketed = String(host.dropFirst().dropLast())
+        } else {
+            unbracketed = host
+        }
+
+        if unbracketed == "::" || unbracketed == "::1" {
+            return BindInfo(ipv4Hosts: [], ipv6Hosts: [unbracketed])
+        }
+
+        if let mapped = LsofFParser.ipv4MappedLoopback(unbracketed),
+           LsofFParser.isIPv4Loopback(mapped) {
+            return BindInfo(ipv4Hosts: [mapped], ipv6Hosts: [])
+        }
+
+        if LsofFParser.isIPv4Loopback(unbracketed) {
+            return BindInfo(ipv4Hosts: [unbracketed], ipv6Hosts: [])
+        }
+
+        return .localhost
+    }
+
+    private var preferredIPv4Literal: String {
+        ipv4Hosts.filter { $0.hasPrefix("127.") }.sorted().first ?? "127.0.0.1"
+    }
 }
 
 private struct ListenerKey: Hashable {
@@ -156,7 +231,18 @@ struct LsofFParser {
                 guard !systemProcessDenylist.contains(command) else { continue }
 
                 let key = ListenerKey(port: port, pid: pid)
-                listenersByKey[key] = Listener(port: port, pid: pid, lsofCommand: command)
+                let binds = BindInfo.from(lsofName: value)
+                if var existing = listenersByKey[key] {
+                    existing.binds.merge(binds)
+                    listenersByKey[key] = existing
+                } else {
+                    listenersByKey[key] = Listener(
+                        port: port,
+                        pid: pid,
+                        lsofCommand: command,
+                        binds: binds
+                    )
+                }
             default:
                 break
             }
@@ -168,16 +254,21 @@ struct LsofFParser {
         }
     }
 
+    static func hostFromName(_ name: String) -> String? {
+        guard let idx = name.lastIndex(of: ":") else { return nil }
+        return String(name[..<idx])
+    }
+
     private static func portFromName(_ name: String) -> Int? {
         guard let idx = name.lastIndex(of: ":") else { return nil }
         let portStr = name[name.index(after: idx)...]
         return Int(portStr)
     }
 
-    /// True when a browser opening `http://localhost:<port>` can hit this socket.
+    /// True when the socket is loopback or wildcard — listed even if Open must
+    /// use `127.0.0.1` rather than `localhost` to hit it.
     static func isLocalhostReachable(name: String) -> Bool {
-        guard let idx = name.lastIndex(of: ":") else { return false }
-        let host = String(name[..<idx])
+        guard let host = hostFromName(name) else { return false }
         return isLocalhostHost(host)
     }
 
@@ -202,7 +293,7 @@ struct LsofFParser {
     }
 
     /// `127.0.0.0/8`
-    private static func isIPv4Loopback(_ host: String) -> Bool {
+    static func isIPv4Loopback(_ host: String) -> Bool {
         let parts = host.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 4, let first = Int(parts[0]), first == 127 else { return false }
         return parts.dropFirst().allSatisfy { octet in
@@ -212,7 +303,7 @@ struct LsofFParser {
     }
 
     /// Returns the embedded IPv4 address for `::ffff:127.0.0.1`, else nil.
-    private static func ipv4MappedLoopback(_ host: String) -> String? {
+    static func ipv4MappedLoopback(_ host: String) -> String? {
         let prefix = "::ffff:"
         guard host.hasPrefix(prefix) else { return nil }
         return String(host.dropFirst(prefix.count))

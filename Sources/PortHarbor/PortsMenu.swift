@@ -293,10 +293,11 @@ struct PortsMenu: View {
 
             // `verbatim` throughout: ports and PIDs are identifiers, and
             // localized number formatting would render 7265 as "7.265".
-            Text(verbatim: ":\(row.port)")
+            Text(verbatim: row.portBadge)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .layoutPriority(1)
+                .help("Opens \(row.browserURL)")
 
             Spacer(minLength: 6)
 
@@ -339,7 +340,7 @@ struct PortsMenu: View {
             case .idle:
                 return isGhost
                     ? ("circle", .secondary, "Stopped")
-                    : ("circle.fill", Palette.statusListening, "Listening on port \(row.port)")
+                    : ("circle.fill", Palette.statusListening, "Listening on \(row.browserURL)")
             }
         }()
 
@@ -385,7 +386,7 @@ struct PortsMenu: View {
                 id: "open-\(row.id)",
                 icon: "arrow.up.right.square",
                 label: "Open",
-                hint: "Opens http://localhost:\(row.port)",
+                hint: "Opens \(row.browserURL)",
                 accessibilityName: "Open \(row.displayTitle) in browser",
                 shortcut: index < 9 ? Character("\(index + 1)") : nil
             ) {
@@ -776,6 +777,9 @@ struct PortsMenu: View {
 
     private func accessibilityLabel(for row: ListenerRow, activity: RowActivity, isGhost: Bool) -> String {
         var parts = [row.displayTitle, "port \(row.port)"]
+        if row.binds.isIPv4Only {
+            parts.append("IPv4 \(row.binds.openHost)")
+        }
         if let framework = row.framework.label { parts.append(framework) }
         parts.append("PID \(row.pid)")
         switch activity {

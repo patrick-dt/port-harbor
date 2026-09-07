@@ -9,7 +9,8 @@ final class ListenerRowTests: XCTestCase {
         fullCommand: String = "/opt/homebrew/bin/node /p/node_modules/.bin/vite dev",
         cwd: String? = "/Users/me/project",
         framework: Framework = .vite,
-        projectName: String? = "project"
+        projectName: String? = "project",
+        binds: BindInfo = .localhost
     ) -> ListenerRow {
         ListenerRow(
             port: port,
@@ -19,6 +20,7 @@ final class ListenerRowTests: XCTestCase {
             cwd: cwd,
             framework: framework,
             projectName: projectName,
+            binds: binds,
             canRelaunch: Actions.canRelaunch(fullCommand: fullCommand)
         )
     }
@@ -58,6 +60,19 @@ final class ListenerRowTests: XCTestCase {
     func testDisplayTitle_fallsBackToPort() {
         XCTAssertEqual(row(projectName: nil).displayTitle, "localhost:3000")
         XCTAssertEqual(row(projectName: "shop").displayTitle, "shop")
+    }
+
+    func testDisplayTitle_usesIPv4LiteralWhenBindIsIPv4Only() {
+        let ipv4 = BindInfo(ipv4Hosts: ["127.0.0.1"], ipv6Hosts: [])
+        XCTAssertEqual(row(projectName: nil, binds: ipv4).displayTitle, "127.0.0.1:3000")
+        XCTAssertEqual(row(projectName: nil, binds: ipv4).browserURL, "http://127.0.0.1:3000")
+    }
+
+    func testPortBadge_showsIPv4HostWhenProjectNamePresent() {
+        let ipv4 = BindInfo(ipv4Hosts: ["127.0.0.1"], ipv6Hosts: [])
+        XCTAssertEqual(row(projectName: "shop", binds: ipv4).portBadge, "127.0.0.1:3000")
+        XCTAssertEqual(row(projectName: "shop").portBadge, ":3000")
+        XCTAssertEqual(row(projectName: nil, binds: ipv4).portBadge, ":3000")
     }
 }
 

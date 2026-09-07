@@ -42,14 +42,14 @@ struct Actions {
     ]
 
     @MainActor
-    static func openURL(port: Int) throws {
-        guard let url = URL(string: "http://localhost:\(port)") else {
-            throw ActionError.invalidCommand(reason: "port \(port) is not a valid URL")
+    static func openURL(_ urlString: String) throws {
+        guard let url = URL(string: urlString) else {
+            throw ActionError.invalidCommand(reason: "\(urlString) is not a valid URL")
         }
         guard NSWorkspace.shared.open(url) else {
             throw ActionError.appUnavailable(
                 name: "Browser",
-                reason: "no application accepted http://localhost:\(port)"
+                reason: "no application accepted \(urlString)"
             )
         }
     }

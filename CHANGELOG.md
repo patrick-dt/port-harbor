@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Open IPv4-only listeners at `http://127.0.0.1:<port>` instead of `localhost`, so a sibling bound to `::1` is not opened by mistake.
+- IPv4-only rows show `127.0.0.1` next to the port so two processes sharing a port are distinguishable.
 - Wrap `containerBackground(..., for: .window)` in `compiler(>=6.0)` so Xcode 15 SDKs still compile.
 - CI `swift build` failed on `macos-14` because that image’s SDK has no `ContainerBackgroundPlacement.window`.
 - Queue overlapping refreshes so ⌘R during an in-flight scan is no longer a silent no-op.

@@ -12,11 +12,25 @@ struct ListenerRow: Identifiable, Hashable {
     let cwd: String?
     let framework: Framework
     let projectName: String?
+    let binds: BindInfo
 
     var id: String { "\(pid)-\(port)" }
 
     var displayTitle: String {
-        projectName ?? "localhost:\(port)"
+        projectName ?? "\(binds.openHost):\(port)"
+    }
+
+    /// Port slot in the title row. IPv4-only binds show the literal so a
+    /// sibling on `::1` with the same port is visually distinct.
+    var portBadge: String {
+        if projectName != nil, binds.isIPv4Only {
+            return "\(binds.openHost):\(port)"
+        }
+        return ":\(port)"
+    }
+
+    var browserURL: String {
+        binds.httpURL(port: port)
     }
 
     var subtitle: String {
@@ -214,6 +228,7 @@ final class PortsStore: ObservableObject {
                     cwd: info?.cwd,
                     framework: framework,
                     projectName: projectName,
+                    binds: l.binds,
                     canRelaunch: Actions.canRelaunch(fullCommand: fullCommand)
                 )
             }
@@ -277,7 +292,7 @@ final class PortsStore: ObservableObject {
 
     func openURL(for row: ListenerRow) {
         run("Open", on: row, command: nil) {
-            try Actions.openURL(port: row.port)
+            try Actions.openURL(row.browserURL)
         }
     }
 

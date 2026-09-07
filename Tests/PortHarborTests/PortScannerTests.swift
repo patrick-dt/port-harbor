@@ -55,6 +55,19 @@ final class PortScannerTests: XCTestCase {
         XCTAssertTrue(listeners.contains { $0.pid == 333 && $0.port == 3333 })
         XCTAssertTrue(listeners.contains { $0.pid == 444 && $0.port == 8080 })
         XCTAssertTrue(listeners.contains { $0.pid == 555 && $0.port == 4000 })
+
+        let wildcard = listeners.first { $0.pid == 111 }!
+        XCTAssertTrue(wildcard.binds.isIPv4Only)
+        XCTAssertEqual(wildcard.binds.openHost, "127.0.0.1")
+
+        let ipv6 = listeners.first { $0.pid == 333 }!
+        XCTAssertTrue(ipv6.binds.isIPv6Only)
+        XCTAssertEqual(ipv6.binds.openHost, "localhost")
+
+        let dual = listeners.first { $0.pid == 555 }!
+        XCTAssertTrue(dual.binds.hasIPv4)
+        XCTAssertTrue(dual.binds.hasIPv6)
+        XCTAssertEqual(dual.binds.openHost, "localhost")
     }
 
     func testParser_ignoresNonLocalInterfaces() {
@@ -77,5 +90,39 @@ final class PortScannerTests: XCTestCase {
         XCTAssertTrue(LsofFParser.isLocalhostReachable(name: "localhost:3000"))
         XCTAssertFalse(LsofFParser.isLocalhostReachable(name: "8.8.8.8:53"))
         XCTAssertFalse(LsofFParser.isLocalhostReachable(name: "[fe80::1]:80"))
+    }
+
+    func testBindInfo_openHostMatchesAddressFamily() {
+        XCTAssertEqual(BindInfo.from(host: "127.0.0.1").openHost, "127.0.0.1")
+        XCTAssertEqual(BindInfo.from(host: "127.0.0.2").openHost, "127.0.0.2")
+        XCTAssertEqual(BindInfo.from(host: "0.0.0.0").openHost, "127.0.0.1")
+        XCTAssertEqual(BindInfo.from(host: "*").openHost, "127.0.0.1")
+        XCTAssertEqual(BindInfo.from(host: "[::1]").openHost, "localhost")
+        XCTAssertEqual(BindInfo.from(host: "[::]").openHost, "localhost")
+        XCTAssertEqual(BindInfo.from(host: "localhost").openHost, "localhost")
+        XCTAssertEqual(BindInfo.from(host: "::ffff:127.0.0.1").openHost, "127.0.0.1")
+
+        var merged = BindInfo.from(host: "127.0.0.1")
+        merged.merge(BindInfo.from(host: "[::1]"))
+        XCTAssertEqual(merged.openHost, "localhost")
+        XCTAssertEqual(merged.httpURL(port: 4321), "http://localhost:4321")
+    }
+
+    func testParser_keepsSeparatePidsOnSamePortAcrossFamilies() {
+        let output = """
+        p111
+        castro
+        n[::1]:4321
+        p222
+        cnode
+        n127.0.0.1:4321
+        """
+
+        let listeners = LsofFParser.parse(output: output)
+        XCTAssertEqual(listeners.count, 2)
+        let v6 = listeners.first { $0.pid == 111 }!
+        let v4 = listeners.first { $0.pid == 222 }!
+        XCTAssertEqual(v6.binds.httpURL(port: 4321), "http://localhost:4321")
+        XCTAssertEqual(v4.binds.httpURL(port: 4321), "http://127.0.0.1:4321")
     }
 }
