@@ -2,42 +2,63 @@
 
 A lightweight macOS menu bar app that shows local dev servers reachable as `localhost` (IPv4/IPv6 loopback and wildcard binds) and lets you open, restart, or stop them with one click.
 
-![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Swift 5.10](https://img.shields.io/badge/Swift-5.10-orange)
+<p align="center">
+  <img src="Resources/AppIcon.png" width="128" alt="Port Harbor">
+</p>
+
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Swift 5.10](https://img.shields.io/badge/Swift-5.10-orange) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
+
+## Installation
+
+**Direct download:** grab the latest DMG from the [releases page](https://github.com/patrick-dt/port-harbor/releases/latest), open it, and drag Port Harbor to Applications.
+
+**From source** (this Mac):
+
+```sh
+git clone https://github.com/patrick-dt/port-harbor.git
+cd port-harbor
+./scripts/package-app.sh
+```
+
+That installs `/Applications/Port Harbor.app` (menu bar only, no Dock icon). Run the same command again after code changes to replace it.
+
+Requires macOS 13 or later. The release DMG is a universal binary (Apple Silicon and Intel).
+
+> Until the app is [Developer ID–signed and notarized](docs/releasing.md), macOS Gatekeeper may block a downloaded DMG. Right-click the app → **Open**, or build from source with `package-app.sh` instead.
 
 ## Features
 
 - **Auto-discovery** — scans localhost-reachable TCP listeners via `lsof` every 3 seconds
-- **Framework detection** — recognizes Next.js, Vite, Nuxt, Django, Rails, Flask, and 15+ more
-- **Quick actions** — open in browser, Cursor, Terminal; restart or stop any server
+- **Framework detection** — Next.js, Vite, Nuxt, Astro, Sanity, Django, Rails, Flask, and 15+ more, with colored badges in the list
+- **Quick actions** — open in browser, Cursor, or Terminal; restart or stop any server
 - **Undo for Stop** — a stopped server stays listed for 5 seconds with an Undo that reruns its command
 - **Ignore list** — hide apps that merely hold a local port (Raycast, Spotify, …); persisted in `UserDefaults`
 - **Keyboard** — `⌘1`–`⌘9` open the first nine servers, `⌘R` rescans, `⌘Q` quits
-- **Zero config** — no setup, no background daemon, just a menu bar icon
+- **Zero config** — no setup, no background daemon, just a menu bar icon (with a live listener count)
 
-## Build & Run
+## Building
 
-```bash
+```sh
 swift build
 swift run PortHarbor
-# or open in Xcode:
-open Package.swift
+swift test          # needs full Xcode; Command Line Tools alone don't ship XCTest
+open Package.swift  # Xcode
 ```
 
-### Install / update the Mac app
+**App icon:** put a square PNG at `Resources/AppIcon.png` (1024×1024 preferred). `package-app.sh` / `release.sh` turn it into `AppIcon.icns`. The menu bar still uses SF Symbol `server.rack`.
 
-```bash
-./scripts/package-app.sh
+## Releasing
+
+Pushing a `v*` tag on `main` builds a universal DMG and publishes it to GitHub Releases. Homebrew and Sparkle auto-updates are the same path OpenUsage uses, once a Developer ID certificate is in place — see [docs/releasing.md](docs/releasing.md).
+
+```sh
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin v0.1.0
 ```
-
-That builds a release `.app` and installs it to `/Applications/Port Harbor.app` (menu bar only, no Dock icon). Run the same command again after code changes to replace the installed app — it quits a running copy first, then overwrites `/Applications`.
-
-**App icon:** put a square PNG at `Resources/AppIcon.png` (1024×1024 preferred). The package script turns it into `AppIcon.icns` and embeds it. Swap the file and re-run the script to change the Finder/Spotlight icon. The menu bar still uses SF Symbol `server.rack`.
-
-`swift test` needs a full Xcode install; the Command Line Tools alone don't ship `XCTest`.
 
 ## Security Notes
 
-Port Harbor runs **entirely locally** with no network communication. It uses only hardcoded system paths (`/usr/sbin/lsof`, `/bin/ps`, `/bin/kill`) to avoid PATH injection.
+Port Harbor runs **entirely locally** with no network communication. It uses only hardcoded system paths (`/usr/sbin/lsof`, `/bin/ps`, `/bin/kill`) to avoid PATH injection. Report vulnerabilities privately — see [SECURITY.md](SECURITY.md).
 
 ### Restart behaviour
 
@@ -67,4 +88,4 @@ The app requires no special entitlements. It uses:
 
 ## License
 
-MIT
+[MIT](LICENSE)

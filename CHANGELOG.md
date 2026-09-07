@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CI `swift build` failed on `macos-14` because that image’s SDK has no `ContainerBackgroundPlacement.window`.
 - Queue overlapping refreshes so ⌘R during an in-flight scan is no longer a silent no-op.
 - Framework detection now uses path/token boundaries, avoiding false Next.js/Vite labels from folder names like `next-app`.
 - Express is detected from an `express` token, not from a bare `node … server` command.
@@ -27,7 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Colored monogram badges for frameworks (Astro orange “A”, Next.js “N”, Sanity red “S”, …) instead of generic SF Symbols.
+- Colored framework badges: Astro and Next.js as SwiftUI vector marks (plus `.svg` sources); Sanity as bundled PNG; other frameworks keep monogram tiles.
 - Sanity Studio detection (`sanity` / `@sanity` in the command line).
-- GitHub Actions CI (`macos-14`) running `swift build` and `swift test`.
+- GitHub Actions CI (`macos-15`, `actions/checkout@v5`) running `swift build` and `swift test`.
+- GitHub Releases publish a universal DMG when a `v*` tag is pushed (`scripts/release.sh`).
 - Unit tests for shell quoting, pasteable commands, scan-freeze policy, and framework token matching.
