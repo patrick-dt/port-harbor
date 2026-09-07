@@ -282,10 +282,7 @@ struct PortsMenu: View {
         HStack(alignment: .center, spacing: 6) {
             statusIndicator(row, activity: activity, isGhost: isGhost)
 
-            if row.framework.hasVectorMark
-                || row.framework.rasterResourceName != nil
-                || row.framework.monogram != nil
-            {
+            if row.framework.hasBundledMark || row.framework.monogram != nil {
                 FrameworkBadge(framework: row.framework)
             }
 

@@ -3,7 +3,7 @@
 A lightweight macOS menu bar app that shows local dev servers reachable as `localhost` (IPv4/IPv6 loopback and wildcard binds) and lets you open, restart, or stop them with one click.
 
 <p align="center">
-  <img src="Resources/AppIcon.png" width="128" alt="Port Harbor">
+  <img src="Resources/screenshot.jpg" width="720" alt="Port Harbor menu bar popover with a running Astro dev server">
 </p>
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Swift 5.10](https://img.shields.io/badge/Swift-5.10-orange) ![License: MIT](https://img.shields.io/badge/license-MIT-green)

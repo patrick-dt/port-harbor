@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Queue overlapping refreshes so ⌘R during an in-flight scan is no longer a silent no-op.
 - Framework detection now uses path/token boundaries, avoiding false Next.js/Vite labels from folder names like `next-app`.
 - Express is detected from an `express` token, not from a bare `node … server` command.
+- Framework badges render the bundled Astro/Next.js SVGs and Sanity PNG instead of approximate SwiftUI paths.
 
 ### Changed
 

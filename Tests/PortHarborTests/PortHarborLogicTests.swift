@@ -75,6 +75,28 @@ final class FrameworkTests: XCTestCase {
         }
     }
 
+    func testBundledMarksLoadFromFrameworkIcons() {
+        let expected: [(Framework, String, String)] = [
+            (.nextjs, "framework-nextjs", "svg"),
+            (.astro, "framework-astro", "svg"),
+            (.sanity, "framework-sanity", "png"),
+        ]
+        for (framework, name, ext) in expected {
+            XCTAssertEqual(framework.bundledMarkResource?.name, name)
+            XCTAssertEqual(framework.bundledMarkResource?.ext, ext)
+            XCTAssertNotNil(
+                FrameworkIconResources.url(named: name, extension: ext),
+                "\(name).\(ext) should be in the resource bundle"
+            )
+            let image = framework.bundledMarkImage
+            XCTAssertNotNil(image, "\(framework) should decode \(name).\(ext)")
+            XCTAssertGreaterThan(image?.size.width ?? 0, 0)
+            XCTAssertGreaterThan(image?.size.height ?? 0, 0)
+        }
+        XCTAssertFalse(Framework.vite.hasBundledMark)
+        XCTAssertNil(Framework.unknown.bundledMarkImage)
+    }
+
     func testSubtitle_omitsUnknownFrameworkAndPID() {
         let subtitle = FrameworkDetector.subtitle(
             framework: .unknown,
