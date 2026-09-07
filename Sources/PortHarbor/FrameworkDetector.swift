@@ -122,27 +122,6 @@ enum Framework: String, CaseIterable {
     }
 }
 
-/// Compact colored monogram so frameworks are recognizable at a glance —
-/// SF Symbols like `sparkles` read as generic chrome, not Astro/Next/Sanity.
-struct FrameworkBadge: View {
-    let framework: Framework
-
-    var body: some View {
-        if let monogram = framework.monogram {
-            Text(monogram)
-                .font(.system(size: monogram.count > 1 ? 7.5 : 9, weight: .heavy, design: .rounded))
-                .foregroundStyle(framework.badgeForeground)
-                .frame(width: 16, height: 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(framework.badgeBackground)
-                )
-                .accessibilityHidden(true)
-                .help(framework.label ?? "")
-        }
-    }
-}
-
 struct FrameworkDetector {
     /// Detect framework from the full command line string returned by `ps`.
     ///

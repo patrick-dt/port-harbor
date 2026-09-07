@@ -282,7 +282,10 @@ struct PortsMenu: View {
         HStack(alignment: .center, spacing: 6) {
             statusIndicator(row, activity: activity, isGhost: isGhost)
 
-            if row.framework.monogram != nil {
+            if row.framework.hasVectorMark
+                || row.framework.rasterResourceName != nil
+                || row.framework.monogram != nil
+            {
                 FrameworkBadge(framework: row.framework)
             }
 
@@ -802,6 +805,8 @@ struct PortsMenu: View {
 /// unless the panel itself is marked opaque.
 private struct SolidWindowBackground: ViewModifier {
     func body(content: Content) -> some View {
+        // `.window` is macOS 15 SDK only; `#available` does not hide it from Xcode 15.
+        #if compiler(>=6.0)
         if #available(macOS 15.0, *) {
             content
                 .containerBackground(Color(nsColor: .windowBackgroundColor), for: .window)
@@ -811,6 +816,11 @@ private struct SolidWindowBackground: ViewModifier {
                 .background(Color(nsColor: .windowBackgroundColor))
                 .background(OpaquePopoverWindow())
         }
+        #else
+        content
+            .background(Color(nsColor: .windowBackgroundColor))
+            .background(OpaquePopoverWindow())
+        #endif
     }
 }
 

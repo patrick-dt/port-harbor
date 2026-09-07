@@ -12,7 +12,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "PortHarbor",
-            path: "Sources/PortHarbor"
+            path: "Sources/PortHarbor",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "PortHarborTests",
