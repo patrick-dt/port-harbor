@@ -1,10 +1,13 @@
 import Foundation
+import AppKit
+import SwiftUI
 
 enum Framework: String, CaseIterable {
     case nextjs = "Next.js"
     case vite = "Vite"
     case nuxt = "Nuxt"
     case astro = "Astro"
+    case sanity = "Sanity"
     case remix = "Remix"
     case express = "Express"
     case django = "Django"
@@ -23,144 +26,228 @@ enum Framework: String, CaseIterable {
     case node = "Node"
     case python = "Python"
     case ruby = "Ruby"
-    case unknown = "Server"
+    case unknown = "Unknown"
 
-    /// SF Symbol name for each framework.
-    var iconName: String {
+    /// Framework name for display, or `nil` when detection did not identify one.
+    /// Callers omit the segment entirely rather than labelling a row "Unknown".
+    var label: String? {
+        self == .unknown ? nil : rawValue
+    }
+
+    /// Single-letter (or short) mark for the colored badge. `nil` for unknown —
+    /// no placeholder glyph that would outweigh the port number.
+    var monogram: String? {
         switch self {
-        case .nextjs:    return "n.circle.fill"
-        case .vite:      return "bolt.fill"
-        case .nuxt:      return "arrowtriangle.up.fill"
-        case .astro:     return "sparkles"
-        case .remix:     return "arrow.triangle.2.circlepath"
-        case .express:   return "shippingbox.fill"
-        case .django:    return "d.circle.fill"
-        case .flask:     return "flask.fill"
-        case .rails:     return "tram.fill"
-        case .hugo:      return "h.circle.fill"
-        case .gatsby:    return "g.circle.fill"
-        case .angular:   return "a.circle.fill"
-        case .svelte:    return "s.circle.fill"
-        case .webpack:   return "cube.fill"
-        case .esbuild:   return "bolt.circle.fill"
-        case .parcel:    return "shippingbox"
-        case .php:       return "p.circle.fill"
-        case .uvicorn, .fastapi: return "u.circle.fill"
-        case .node:      return "n.circle"
-        case .python:    return "p.circle"
-        case .ruby:      return "r.circle"
-        case .unknown:   return "circle.fill"
+        case .nextjs:  return "N"
+        case .vite:    return "V"
+        case .nuxt:    return "N"
+        case .astro:   return "A"
+        case .sanity:  return "S"
+        case .remix:   return "R"
+        case .express: return "E"
+        case .django:  return "D"
+        case .flask:   return "F"
+        case .rails:   return "R"
+        case .hugo:    return "H"
+        case .gatsby:  return "G"
+        case .angular: return "A"
+        case .svelte:  return "S"
+        case .webpack: return "W"
+        case .esbuild: return "es"
+        case .parcel:  return "P"
+        case .php:     return "P"
+        case .uvicorn: return "U"
+        case .fastapi: return "F"
+        case .node:    return "JS"
+        case .python:  return "Py"
+        case .ruby:    return "Rb"
+        case .unknown: return nil
+        }
+    }
+
+    /// Brand-tint fill for the monogram badge (appearance-aware where needed).
+    var badgeBackground: Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            switch self {
+            case .nextjs:
+                // Next mark is black-on-white / white-on-black.
+                return dark ? NSColor.white : NSColor.black
+            case .vite:    return NSColor(srgbRed: 0.39, green: 0.40, blue: 0.95, alpha: 1) // #646CFF
+            case .nuxt:    return NSColor(srgbRed: 0.00, green: 0.86, blue: 0.51, alpha: 1) // #00DC82
+            case .astro:   return NSColor(srgbRed: 1.00, green: 0.36, blue: 0.01, alpha: 1) // #FF5D01
+            case .sanity:  return NSColor(srgbRed: 0.94, green: 0.24, blue: 0.18, alpha: 1) // #F03E2F
+            case .remix:   return dark
+                ? NSColor(srgbRed: 0.85, green: 0.85, blue: 0.88, alpha: 1)
+                : NSColor(srgbRed: 0.07, green: 0.07, blue: 0.09, alpha: 1)
+            case .express: return NSColor(srgbRed: 0.26, green: 0.26, blue: 0.26, alpha: 1)
+            case .django:  return NSColor(srgbRed: 0.04, green: 0.18, blue: 0.13, alpha: 1)
+            case .flask:   return NSColor(srgbRed: 0.22, green: 0.22, blue: 0.24, alpha: 1)
+            case .rails:   return NSColor(srgbRed: 0.80, green: 0.00, blue: 0.00, alpha: 1)
+            case .hugo:    return NSColor(srgbRed: 1.00, green: 0.25, blue: 0.53, alpha: 1)
+            case .gatsby:  return NSColor(srgbRed: 0.40, green: 0.20, blue: 0.60, alpha: 1)
+            case .angular: return NSColor(srgbRed: 0.87, green: 0.00, blue: 0.19, alpha: 1)
+            case .svelte:  return NSColor(srgbRed: 1.00, green: 0.24, blue: 0.00, alpha: 1)
+            case .webpack: return NSColor(srgbRed: 0.55, green: 0.84, blue: 0.98, alpha: 1)
+            case .esbuild: return NSColor(srgbRed: 1.00, green: 0.81, blue: 0.00, alpha: 1)
+            case .parcel:  return NSColor(srgbRed: 0.13, green: 0.22, blue: 0.29, alpha: 1)
+            case .php:     return NSColor(srgbRed: 0.47, green: 0.48, blue: 0.71, alpha: 1)
+            case .uvicorn, .fastapi:
+                return NSColor(srgbRed: 0.00, green: 0.59, blue: 0.53, alpha: 1)
+            case .node:    return NSColor(srgbRed: 0.27, green: 0.69, blue: 0.29, alpha: 1)
+            case .python:  return NSColor(srgbRed: 0.22, green: 0.46, blue: 0.67, alpha: 1)
+            case .ruby:    return NSColor(srgbRed: 0.80, green: 0.20, blue: 0.18, alpha: 1)
+            case .unknown: return NSColor.secondaryLabelColor
+            }
+        })
+    }
+
+    var badgeForeground: Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            switch self {
+            case .nextjs:
+                return dark ? NSColor.black : NSColor.white
+            case .nuxt, .webpack, .esbuild:
+                // Light fills need dark ink for contrast.
+                return NSColor(srgbRed: 0.08, green: 0.10, blue: 0.12, alpha: 1)
+            case .remix:
+                return dark
+                    ? NSColor(srgbRed: 0.07, green: 0.07, blue: 0.09, alpha: 1)
+                    : NSColor.white
+            default:
+                return NSColor.white
+            }
+        })
+    }
+}
+
+/// Compact colored monogram so frameworks are recognizable at a glance —
+/// SF Symbols like `sparkles` read as generic chrome, not Astro/Next/Sanity.
+struct FrameworkBadge: View {
+    let framework: Framework
+
+    var body: some View {
+        if let monogram = framework.monogram {
+            Text(monogram)
+                .font(.system(size: monogram.count > 1 ? 7.5 : 9, weight: .heavy, design: .rounded))
+                .foregroundStyle(framework.badgeForeground)
+                .frame(width: 16, height: 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(framework.badgeBackground)
+                )
+                .accessibilityHidden(true)
+                .help(framework.label ?? "")
         }
     }
 }
 
 struct FrameworkDetector {
     /// Detect framework from the full command line string returned by `ps`.
+    ///
+    /// Matching prefers path segments and whitespace-delimited tokens over raw
+    /// substrings, so a project path containing `next` does not become Next.js.
     static func detect(from command: String) -> Framework {
         let lower = command.lowercased()
 
         // Order matters: more specific patterns first.
 
-        // Next.js
-        if lower.contains("next") && (lower.contains("dev") || lower.contains("start") || lower.contains("node")) {
+        // Next.js — require CLI/server markers, not merely the letters "next".
+        if mentions(lower, "next-server")
+            || mentions(lower, "next/dist")
+            || hasPhrase(lower, "next dev")
+            || hasPhrase(lower, "next start")
+            || (mentions(lower, "next") && (hasPhrase(lower, "dev") || hasPhrase(lower, "start"))
+                && mentionsAny(lower, "node", "npm", "npx", "yarn", "pnpm", "bun"))
+        {
             return .nextjs
         }
 
-        // Nuxt
-        if lower.contains("nuxt") || lower.contains("nuxi") {
+        if mentionsAny(lower, "nuxt", "nuxi") {
             return .nuxt
         }
 
-        // Astro
-        if lower.contains("astro") {
+        if mentions(lower, "astro") {
             return .astro
         }
 
-        // Remix
-        if lower.contains("remix") {
+        // Sanity Studio / CLI (`sanity dev`, `@sanity/…`).
+        if mentions(lower, "sanity") {
+            return .sanity
+        }
+
+        if mentions(lower, "remix") {
             return .remix
         }
 
-        // SvelteKit
-        if lower.contains("svelte") {
+        if mentionsAny(lower, "svelte-kit", "sveltekit") || mentions(lower, "svelte") {
             return .svelte
         }
 
-        // Vite (check after framework-specific ones since many use Vite under the hood)
-        if lower.contains("vite") {
+        // Vite — path/token only (after framework-specific detectors).
+        if mentions(lower, "vite") {
             return .vite
         }
 
-        // Angular
-        if lower.contains("ng serve") || lower.contains("@angular") {
+        if hasPhrase(lower, "ng serve") || mentions(lower, "@angular") {
             return .angular
         }
 
-        // Gatsby
-        if lower.contains("gatsby") {
+        if mentions(lower, "gatsby") {
             return .gatsby
         }
 
-        // Hugo
-        if lower.contains("hugo") {
+        if mentions(lower, "hugo") {
             return .hugo
         }
 
-        // Webpack dev server
-        if lower.contains("webpack") {
+        if mentions(lower, "webpack") {
             return .webpack
         }
 
-        // esbuild
-        if lower.contains("esbuild") {
+        if mentions(lower, "esbuild") {
             return .esbuild
         }
 
-        // Parcel
-        if lower.contains("parcel") {
+        if mentions(lower, "parcel") {
             return .parcel
         }
 
-        // Express
-        if lower.contains("express") || (lower.contains("node") && lower.contains("server")) {
+        // Express: require the package/module name, not merely "server".
+        if mentions(lower, "express") {
             return .express
         }
 
-        // Django
-        if lower.contains("manage.py") && lower.contains("runserver") {
+        if mentions(lower, "manage.py") && hasPhrase(lower, "runserver") {
             return .django
         }
 
-        // Flask
-        if lower.contains("flask") {
+        if mentions(lower, "flask") {
             return .flask
         }
 
-        // FastAPI / Uvicorn
-        if lower.contains("uvicorn") {
-            return lower.contains("fastapi") ? .fastapi : .uvicorn
+        if mentions(lower, "uvicorn") {
+            return mentions(lower, "fastapi") ? .fastapi : .uvicorn
         }
 
-        // PHP built-in server
-        if lower.contains("php") && lower.contains("-s") {
+        if mentions(lower, "php") && hasPhrase(lower, "-s") {
             return .php
         }
 
-        // Rails
-        if lower.contains("rails") || lower.contains("puma") {
+        if mentionsAny(lower, "rails", "puma") {
             return .rails
         }
 
-        // Generic fallbacks
-        if lower.contains("node") || lower.contains("npm") || lower.contains("npx") || lower.contains("tsx") || lower.contains("ts-node") {
+        if mentionsAny(lower, "node", "npm", "npx", "tsx", "ts-node") {
             return .node
         }
 
-        if lower.contains("python") || lower.contains("python3") {
+        if mentionsAny(lower, "python", "python3") {
             return .python
         }
 
-        if lower.contains("ruby") || lower.contains("bundle exec") {
+        if mentions(lower, "ruby") || hasPhrase(lower, "bundle exec") {
             return .ruby
         }
 
@@ -176,13 +263,19 @@ struct FrameworkDetector {
         return last
     }
 
-    /// Build a concise subtitle like "Next.js · npm run dev · PID 41732"
-    static func subtitle(framework: Framework, fullCommand: String, pid: Int) -> String {
-        let shortCmd = shortCommand(fullCommand)
-        return "\(framework.rawValue) · \(shortCmd) · PID \(pid)"
+    /// Build a concise subtitle like "Next.js · npm run dev".
+    ///
+    /// The PID is deliberately not part of this string: the subtitle is
+    /// truncated to one line, and the PID is the identifier the confirmation
+    /// dialogs refer to, so it gets its own slot in the row instead.
+    static func subtitle(framework: Framework, fullCommand: String) -> String {
+        let segments = [framework.label, shortCommand(fullCommand)]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return segments.joined(separator: " · ")
     }
 
-    private static func shortCommand(_ cmd: String) -> String {
+    static func shortCommand(_ cmd: String) -> String {
         // Try to extract the npm/yarn/pnpm script portion if present.
         // e.g. "/usr/local/bin/node /path/to/next dev" -> "next dev"
         // e.g. "npm run dev" -> "npm run dev"
@@ -219,5 +312,37 @@ struct FrameworkDetector {
 
         // Generic: just truncate
         return String(cmd.prefix(50))
+    }
+
+    // MARK: - Token / path helpers
+
+    /// True when `token` appears as a path segment or whitespace-delimited word.
+    static func mentions(_ command: String, _ token: String) -> Bool {
+        let t = token.lowercased()
+        guard !t.isEmpty else { return false }
+
+        if command == t { return true }
+        if command.hasPrefix(t + " ") || command.hasSuffix(" " + t) { return true }
+        if command.contains(" " + t + " ") { return true }
+        if command.contains("/" + t + "/") { return true }
+        if command.contains("/" + t + " ") { return true }
+        if command.hasSuffix("/" + t) { return true }
+        if command.hasPrefix(t + "/") { return true }
+
+        // Scoped packages: @scope/token
+        if command.contains("/" + t + "@") || command.contains("@" + t) {
+            return command.contains(t)
+        }
+
+        // Dotted module paths ending in the token (express/lib → still need /express)
+        return false
+    }
+
+    static func mentionsAny(_ command: String, _ tokens: String...) -> Bool {
+        tokens.contains { mentions(command, $0) }
+    }
+
+    static func hasPhrase(_ command: String, _ phrase: String) -> Bool {
+        command.contains(phrase.lowercased())
     }
 }

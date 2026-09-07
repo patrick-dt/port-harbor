@@ -1,0 +1,39 @@
+---
+description: When and how to test Port Harbor (Swift PM / XCTest)
+globs: Sources/**/*.swift,Tests/**/*.swift,Package.swift
+alwaysApply: false
+---
+
+# Testing
+
+## Commands
+
+```bash
+swift build
+swift test   # needs full Xcode (CLI tools alone lack XCTest)
+swift run PortHarbor
+```
+
+If `swift test` fails because XCTest is missing, say so — do not invent a fake pass.
+
+## What must have tests
+
+Prefer unit tests in `Tests/PortHarborTests/` for pure logic:
+
+- Framework / process classification (`FrameworkDetector`, row heuristics)
+- Restart command validation (shell metacharacters, rejection paths)
+- Stop confirmation rules (`needsStopConfirmation`, working directory quirks)
+- Ignore-list / store behavior that does not need a live menu bar
+
+## What may stay light
+
+- SwiftUI / `NSMenu` presentation (`PortsMenu`, app entry)
+- Live `lsof` / `ps` integration (prefer parsing fixtures over killing real processes)
+
+## Rules of engagement
+
+- Logic or security-sensitive change → add or update a failing test first when practical, then fix.
+- Do not swallow failures in production paths; tests should assert error surfacing where relevant.
+- Never write tests that `kill` arbitrary host PIDs or shell out to mutate the user's machine.
+- Before opening a PR that touches `Sources/`, run `swift build` and `swift test` when Xcode is available.
+- Keep tests deterministic: inject strings/structs; avoid wall-clock flakiness except intentional short timeouts already used in product code.

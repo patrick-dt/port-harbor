@@ -1,0 +1,33 @@
+---
+description: SemVer versioning, git tags, and changelog for Port Harbor releases
+alwaysApply: false
+---
+
+# Versioning (SemVer)
+
+Port Harbor uses **Semantic Versioning**: `MAJOR.MINOR.PATCH`.
+
+| Bump | When |
+|------|------|
+| **MAJOR** | Breaking UX/API change (e.g. remove a menu action, change restart semantics) |
+| **MINOR** | New feature, backward compatible (e.g. new framework detection) |
+| **PATCH** | Bug fix, docs, internal refactor with no user-facing change |
+
+## Releases
+
+- Ship versions as **annotated git tags**: `v1.2.3` (leading `v` required).
+- Tag only from `main` after the release commit is merged.
+- Do **not** bump version on every PR — only when cutting a release.
+- Keep a root `CHANGELOG.md` (Keep a Changelog style: Added / Changed / Fixed / Security).
+- Unreleased work goes under `## [Unreleased]`; move it into `## [X.Y.Z] - YYYY-MM-DD` at release time.
+
+```bash
+# Example release
+git tag -a v0.2.0 -m "v0.2.0"
+git push origin v0.2.0
+```
+
+## Package / app version
+
+- Do not invent a version field in `Package.swift` for this executable.
+- If a macOS bundle/`Info.plist` is added later, keep `CFBundleShortVersionString` in sync with the git tag (without the `v` prefix).

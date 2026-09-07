@@ -1,0 +1,54 @@
+---
+description: Branch naming, Conventional Commits, and pull request workflow for Port Harbor
+alwaysApply: false
+---
+
+# Git workflow
+
+## Branches
+
+- Branch from up-to-date `main`. Never commit feature work directly on `main`.
+- Name: `<type>/<short-kebab-description>`
+
+| Type | Use for |
+|------|---------|
+| `feat/` | New user-facing capability |
+| `fix/` | Bug fix |
+| `chore/` | Tooling, deps, housekeeping |
+| `docs/` | README / comments only |
+| `refactor/` | No behavior change |
+| `test/` | Tests only |
+| `release/` | Version bump + changelog |
+
+```text
+✅ feat/ignore-list-persistence
+✅ fix/restart-shell-metachar-check
+❌ Feature/IgnoreList
+❌ my-branch
+```
+
+- One concern per branch; prefer small PRs over long-lived branches.
+- Delete the branch after merge.
+
+## Commits
+
+Use **Conventional Commits**: `<type>(optional-scope): <imperative summary>`
+
+```text
+✅ feat: detect Astro and Remix frameworks
+✅ fix(actions): reject restart when command has metacharacters
+✅ test: cover ListenerRow stop confirmation
+❌ Fixed stuff / WIP / update
+```
+
+- Focus the message on **why**, not a file list.
+- Do not commit `.env`, secrets, or `.build/` artifacts.
+- Only create commits when the user asks.
+
+## Pull requests
+
+- Push with `-u` when the branch has no upstream yet.
+- PR title matches the primary conventional commit theme.
+- Body includes **Summary** (1–3 bullets) and **Test plan** (checklist).
+- Do not force-push to `main`; avoid `--force` unless the user explicitly requests it.
+- Do not merge or push unless the user asks.

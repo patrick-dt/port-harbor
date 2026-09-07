@@ -11,44 +11,101 @@ private struct ListenerKey: Hashable {
     let pid: Int
 }
 
-enum PortScannerError: Error {
-    case lsofFailed(exitCode: Int32)
+enum PortScannerError: LocalizedError {
+    case lsofMissing(path: String)
+    case lsofFailed(exitCode: Int32, message: String)
+    case lsofUnlaunchable(reason: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .lsofMissing(let path):
+            return "\(path) not found — Port Harbor needs lsof to list open ports."
+        case .lsofFailed(let code, let message):
+            return message.isEmpty
+                ? "lsof exited with code \(code)."
+                : "lsof failed (exit \(code)): \(message)"
+        case .lsofUnlaunchable(let reason):
+            return "Could not run lsof: \(reason)"
+        }
+    }
+
+    /// The command a user can run in a terminal to reproduce the failure.
+    var reproductionCommand: String { PortScanner.commandLine }
 }
 
 struct PortScanner {
-    /// Returns all TCP LISTEN sockets that are bound to `127.0.0.1:<port>`.
-    static func listLocalhostListeningTCPListeners() async -> [Listener] {
-        await Task.detached(priority: .utility) {
-            do {
-                let output = try runLsof()
-                return LsofFParser.parse(output: output)
-            } catch {
-                return []
-            }
+    private static let lsofPath = "/usr/sbin/lsof"
+
+    // -F pcnLP => machine-readable fields: pid/command/name/login/proto
+    private static let arguments = ["-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcnLP"]
+
+    static var commandLine: String {
+        ([lsofPath] + arguments).joined(separator: " ")
+    }
+
+    /// Returns TCP LISTEN sockets reachable as `localhost:<port>` (IPv4/IPv6
+    /// loopback and wildcard binds). LAN-only unicast addresses are excluded.
+    ///
+    /// Throws when the scan itself could not be performed, so that callers can
+    /// tell "nothing is listening" apart from "we were unable to look".
+    static func listLocalhostListeningTCPListeners() async throws -> [Listener] {
+        try await Task.detached(priority: .utility) {
+            try runLsof()
         }.value
     }
 
-    private static func runLsof() throws -> String {
+    private static func runLsof() throws -> [Listener] {
+        guard FileManager.default.isExecutableFile(atPath: lsofPath) else {
+            throw PortScannerError.lsofMissing(path: lsofPath)
+        }
+
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        // -F pcnLP => machine-readable fields: pid/command/name/login/proto
-        task.arguments = ["-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcnLP"]
+        task.executableURL = URL(fileURLWithPath: lsofPath)
+        task.arguments = arguments
 
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = pipe
 
-        try task.run()
-        task.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-
-        guard task.terminationStatus == 0 else {
-            throw PortScannerError.lsofFailed(exitCode: task.terminationStatus)
+        do {
+            try task.run()
+        } catch {
+            throw PortScannerError.lsofUnlaunchable(reason: error.localizedDescription)
         }
 
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        task.waitUntilExit()
+
+        let output = String(data: data, encoding: .utf8) ?? ""
+        let listeners = LsofFParser.parse(output: output)
+
+        // lsof exits non-zero both when it finds nothing and when it hits a real
+        // problem, and it keeps emitting records while warning about individual
+        // processes it may not inspect. Only treat it as a failure when we got
+        // no usable records *and* it had something to say.
+        if task.terminationStatus != 0, listeners.isEmpty, !output.isEmpty {
+            throw PortScannerError.lsofFailed(
+                exitCode: task.terminationStatus,
+                message: firstDiagnosticLine(in: output)
+            )
+        }
+
+        return listeners
+    }
+
+    /// lsof's field output is one record per line prefixed by a field letter;
+    /// anything else is human-readable diagnostics we can show the user.
+    private static func firstDiagnosticLine(in output: String) -> String {
+        let fieldPrefixes: Set<Character> = ["p", "c", "n", "L", "P", "f", "t"]
+        for line in output.split(separator: "\n") {
+            guard let first = line.first else { continue }
+            if fieldPrefixes.contains(first), line.count > 1 { continue }
+            return String(line).trimmingCharacters(in: .whitespaces)
+        }
         return output
+            .split(separator: "\n")
+            .first
+            .map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
     }
 }
 
@@ -57,7 +114,7 @@ struct PortScanner {
 /// Format is one record per line:
 /// - `p` => pid
 /// - `c` => command (short, may be truncated by lsof)
-/// - `n` => socket name, e.g. `127.0.0.1:3000`
+/// - `n` => socket name, e.g. `127.0.0.1:3000`, `[::1]:3333`, `*:3000`
 struct LsofFParser {
     /// IANA dynamic/ephemeral port range start — these are OS-assigned internal ports.
     private static let ephemeralPortStart = 49152
@@ -89,7 +146,7 @@ struct LsofFParser {
                 command = value
             case "n":
                 guard let pid, let command else { continue }
-                guard value.hasPrefix("127.0.0.1:") else { continue }
+                guard isLocalhostReachable(name: value) else { continue }
                 guard let port = portFromName(value) else { continue }
 
                 // Skip ephemeral/OS-assigned ports
@@ -115,6 +172,50 @@ struct LsofFParser {
         guard let idx = name.lastIndex(of: ":") else { return nil }
         let portStr = name[name.index(after: idx)...]
         return Int(portStr)
+    }
+
+    /// True when a browser opening `http://localhost:<port>` can hit this socket.
+    static func isLocalhostReachable(name: String) -> Bool {
+        guard let idx = name.lastIndex(of: ":") else { return false }
+        let host = String(name[..<idx])
+        return isLocalhostHost(host)
+    }
+
+    private static func isLocalhostHost(_ raw: String) -> Bool {
+        let host = raw.lowercased()
+        if host == "*" || host == "0.0.0.0" || host == "localhost" { return true }
+
+        let unbracketed: String
+        if host.hasPrefix("["), host.hasSuffix("]"), host.count >= 2 {
+            unbracketed = String(host.dropFirst().dropLast())
+        } else {
+            unbracketed = host
+        }
+
+        if unbracketed == "::" || unbracketed == "::1" { return true }
+
+        if let mapped = ipv4MappedLoopback(unbracketed) {
+            return isIPv4Loopback(mapped)
+        }
+
+        return isIPv4Loopback(unbracketed)
+    }
+
+    /// `127.0.0.0/8`
+    private static func isIPv4Loopback(_ host: String) -> Bool {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4, let first = Int(parts[0]), first == 127 else { return false }
+        return parts.dropFirst().allSatisfy { octet in
+            guard let n = Int(octet) else { return false }
+            return (0...255).contains(n)
+        }
+    }
+
+    /// Returns the embedded IPv4 address for `::ffff:127.0.0.1`, else nil.
+    private static func ipv4MappedLoopback(_ host: String) -> String? {
+        let prefix = "::ffff:"
+        guard host.hasPrefix(prefix) else { return nil }
+        return String(host.dropFirst(prefix.count))
     }
 }
 
