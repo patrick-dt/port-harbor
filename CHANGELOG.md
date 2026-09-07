@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Colored framework badges: Astro and Next.js as SwiftUI vector marks (plus `.svg` sources); Sanity as bundled PNG; other frameworks keep monogram tiles.
+- Colored monogram badges for frameworks (Astro orange “A”, Next.js “N”, Sanity red “S”, …) instead of generic SF Symbols.
 - Sanity Studio detection (`sanity` / `@sanity` in the command line).
 - GitHub Actions CI (`macos-15`, `actions/checkout@v5`) running `swift build` and `swift test`.
 - Optional `scripts/release.sh` / Release workflow to build a universal DMG later (not advertised until notarized).
