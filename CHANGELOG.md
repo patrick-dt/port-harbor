@@ -31,5 +31,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Colored framework badges: Astro and Next.js as SwiftUI vector marks (plus `.svg` sources); Sanity as bundled PNG; other frameworks keep monogram tiles.
 - Sanity Studio detection (`sanity` / `@sanity` in the command line).
 - GitHub Actions CI (`macos-15`, `actions/checkout@v5`) running `swift build` and `swift test`.
-- GitHub Releases publish a universal DMG when a `v*` tag is pushed (`scripts/release.sh`).
+- Optional `scripts/release.sh` / Release workflow to build a universal DMG later (not advertised until notarized).
 - Unit tests for shell quoting, pasteable commands, scan-freeze policy, and framework token matching.

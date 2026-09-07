@@ -1,10 +1,8 @@
 name: Release
 
-# Tag a version to ship it: `git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0`
-# See docs/releasing.md
+# Manual only until the app is notarized — a v* tag must not publish a
+# Gatekeeper-blocked DMG. See docs/releasing.md
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:

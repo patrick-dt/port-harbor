@@ -10,9 +10,7 @@ A lightweight macOS menu bar app that shows local dev servers reachable as `loca
 
 ## Installation
 
-**Direct download:** grab the latest DMG from the [releases page](https://github.com/patrick-dt/port-harbor/releases/latest), open it, and drag Port Harbor to Applications.
-
-**From source** (this Mac):
+Needs macOS 13+ and Xcode (or a full Xcode install for `swift test`). Clone and install into `/Applications`:
 
 ```sh
 git clone https://github.com/patrick-dt/port-harbor.git
@@ -20,11 +18,7 @@ cd port-harbor
 ./scripts/package-app.sh
 ```
 
-That installs `/Applications/Port Harbor.app` (menu bar only, no Dock icon). Run the same command again after code changes to replace it.
-
-Requires macOS 13 or later. The release DMG is a universal binary (Apple Silicon and Intel).
-
-> Until the app is [Developer ID–signed and notarized](docs/releasing.md), macOS Gatekeeper may block a downloaded DMG. Right-click the app → **Open**, or build from source with `package-app.sh` instead.
+That builds a release `.app` and copies it to `/Applications/Port Harbor.app` (menu bar only, no Dock icon). Run the same command again after code changes to replace it — it quits a running copy first.
 
 ## Features
 
@@ -45,16 +39,7 @@ swift test          # needs full Xcode; Command Line Tools alone don't ship XCTe
 open Package.swift  # Xcode
 ```
 
-**App icon:** put a square PNG at `Resources/AppIcon.png` (1024×1024 preferred). `package-app.sh` / `release.sh` turn it into `AppIcon.icns`. The menu bar still uses SF Symbol `server.rack`.
-
-## Releasing
-
-Pushing a `v*` tag on `main` builds a universal DMG and publishes it to GitHub Releases. Homebrew and Sparkle auto-updates are the same path OpenUsage uses, once a Developer ID certificate is in place — see [docs/releasing.md](docs/releasing.md).
-
-```sh
-git tag -a v0.1.0 -m "v0.1.0"
-git push origin v0.1.0
-```
+**App icon:** put a square PNG at `Resources/AppIcon.png` (1024×1024 preferred). `package-app.sh` turns it into `AppIcon.icns`. The menu bar still uses SF Symbol `server.rack`.
 
 ## Security Notes
 

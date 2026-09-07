@@ -1,37 +1,27 @@
 # Releasing
 
-Port Harbor ships the way [OpenUsage](https://github.com/robinebers/openusage) does: a public GitHub repo as the storefront, a DMG on [GitHub Releases](https://github.com/patrick-dt/port-harbor/releases), and (later) a Homebrew cask that points at that DMG.
+Install for now is **clone + `./scripts/package-app.sh`**. That builds on the user’s Mac, so Gatekeeper never sees a downloaded binary.
 
-## Cut a release
+A notarized DMG (GitHub Releases, Homebrew cask, Sparkle) needs the [Apple Developer Program](https://developer.apple.com/programs/) (~$99/year). Until then, do not advertise a download button or `brew install --cask`.
+
+## Versions
+
+Keep a changelog. When you want a named version:
 
 1. Move `[Unreleased]` in `CHANGELOG.md` into `## [X.Y.Z] - YYYY-MM-DD`.
 2. Merge to `main`.
-3. Tag and push:
+3. Tag:
 
 ```bash
 git tag -a v0.1.0 -m "v0.1.0"
 git push origin v0.1.0
 ```
 
-Pushing a `v*` tag runs [`.github/workflows/release.yml`](../.github/workflows/release.yml), which builds a universal `.app`, wraps it in `PortHarbor-<version>.dmg`, and attaches that file to a GitHub Release.
+Tags do **not** publish a DMG. The unsigned release workflow is manual (`workflow_dispatch` on [release.yml](../.github/workflows/release.yml)) so a tag cannot accidentally put a Gatekeeper-blocked image on the releases page.
 
-A pre-release suffix (`v0.1.0-beta.1`) marks the GitHub Release as a prerelease.
+## After a Developer ID
 
-## What people install
-
-Until a Homebrew cask is accepted, the README points at **Direct download** of that DMG: open it, drag Port Harbor to Applications.
-
-Local machine (this Mac only):
-
-```bash
-./scripts/package-app.sh
-```
-
-## Signing and notarization (Apple Developer Program)
-
-Without a Developer ID, CI ad-hoc-signs the app. Gatekeeper then blocks the DMG on other Macs until the user right-clicks → Open, or you notarize.
-
-To match OpenUsage’s “download and drag” path, enroll in the [Apple Developer Program](https://developer.apple.com/programs/) (~$99/year) and add these repository secrets:
+`scripts/release.sh` already builds a universal `.app` and DMG. Add these repository secrets, then you can turn tag-push publishing back on:
 
 | Secret | What it is |
 |--------|------------|
@@ -41,28 +31,10 @@ To match OpenUsage’s “download and drag” path, enroll in the [Apple Develo
 | `APPLE_PASSWORD` | [app-specific password](https://appleid.apple.com) for that Apple ID |
 | `APPLE_TEAM_ID` | Apple Developer team ID |
 
-Export the cert from Keychain Access as `.p12`, then `base64 -i DeveloperID.p12 | pbcopy`. With those secrets set, the same tag pipeline signs with Developer ID, notarizes, and staples — the DMG opens without a Gatekeeper detour.
+Export the cert from Keychain Access as `.p12`, then `base64 -i DeveloperID.p12 | pbcopy`. With those set, the pipeline can sign, notarize, and staple — the same path [OpenUsage](https://github.com/robinebers/openusage) uses.
 
-## Homebrew
+Then:
 
-Homebrew’s official cask repo wants a stable HTTPS download (the GitHub Release DMG) and a `sha256`. After the first notarized release:
-
-```ruby
-cask "port-harbor" do
-  version "0.1.0"
-  sha256 "…"
-
-  url "https://github.com/patrick-dt/port-harbor/releases/download/v#{version}/PortHarbor-#{version}.dmg"
-  name "Port Harbor"
-  desc "Menu bar app for local dev servers"
-  homepage "https://github.com/patrick-dt/port-harbor"
-
-  app "Port Harbor.app"
-end
-```
-
-Submit that to [Homebrew/homebrew-cask](https://github.com/Homebrew/homebrew-cask). Until it lands, do not advertise `brew install --cask port-harbor`.
-
-## Sparkle (later)
-
-OpenUsage updates in place via signed Sparkle + an appcast on GitHub Pages. That is the next step after notarization: embed Sparkle, bake `SUFeedURL` / `SUPublicEDKey` into `Info.plist`, and extend the release workflow with `generate_appcast`. Skip it until Developer ID signing works — unsigned Sparkle feeds are not worth the dependency.
+1. Point the README at the latest DMG.
+2. Submit a Homebrew cask whose `url` is that GitHub Release asset.
+3. Optionally embed Sparkle for in-app updates.
