@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Double-click `Open Port Harbor.command` to launch the menu bar app without Xcode.
 - Colored framework badges: Astro and Next.js as SwiftUI vector marks (plus `.svg` sources); Sanity as bundled PNG; other frameworks keep monogram tiles.
 - Sanity Studio detection (`sanity` / `@sanity` in the command line).
 - GitHub Actions CI (`macos-15`, `actions/checkout@v5`) running `swift build` and `swift test`.

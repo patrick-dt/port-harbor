@@ -10,7 +10,11 @@ A lightweight macOS menu bar app that shows local dev servers reachable as `loca
 
 ## Installation
 
-Needs macOS 13+ and Xcode (or a full Xcode install for `swift test`). Clone and install into `/Applications`:
+Needs macOS 13+ and the Swift toolchain. Command Line Tools are enough to run the app; full Xcode is only required for `swift test`.
+
+**From Finder:** double-click `Open Port Harbor.command`. The first time it builds and installs `/Applications/Port Harbor.app`; after that it just launches the menu bar app (no Dock icon).
+
+Or from a terminal:
 
 ```sh
 git clone https://github.com/patrick-dt/port-harbor.git
@@ -18,7 +22,7 @@ cd port-harbor
 ./scripts/package-app.sh
 ```
 
-That builds a release `.app` and copies it to `/Applications/Port Harbor.app` (menu bar only, no Dock icon). Run the same command again after code changes to replace it — it quits a running copy first.
+That builds a release `.app` and copies it to `/Applications/Port Harbor.app`. Run the same command again after code changes to replace it — it quits a running copy first.
 
 ## Features
 
