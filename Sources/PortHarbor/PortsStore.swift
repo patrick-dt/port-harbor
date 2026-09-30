@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 import SwiftUI
@@ -80,6 +81,11 @@ enum ScanState: Equatable {
     case scanning
     case loaded
     case failed(message: String, command: String)
+
+    var isFailed: Bool {
+        if case .failed = self { return true }
+        return false
+    }
 }
 
 @MainActor
@@ -123,7 +129,31 @@ final class PortsStore: ObservableObject {
     private var frozenSince: Date?
     private var pendingRows: [ListenerRow]?
 
-    private let refreshInterval: TimeInterval = 3.0
+    /// Scan often while the list is on screen; when it is closed only the
+    /// menu bar count depends on it, and that can lag without harm. Port
+    /// Harbor runs all day as a login item, so the closed rate is what the
+    /// battery sees.
+    static let visibleRefreshInterval: TimeInterval = 3
+    static let hiddenRefreshInterval: TimeInterval = 20
+    private var isMenuVisible = false
+
+    /// Why nobody can be looking right now. While any reason holds, the timer
+    /// is off entirely: no scans with the display asleep, the screen locked,
+    /// or another user switched in. (During real system sleep macOS suspends
+    /// the process anyway.)
+    enum IdleReason: Hashable {
+        case screensAsleep
+        case screenLocked
+        case sessionInactive
+    }
+    private var idleReasons: Set<IdleReason> = []
+    private var systemObservers: [(NotificationCenter, NSObjectProtocol)] = []
+
+    /// Pure polling policy so tests can cover it without timers.
+    static func refreshInterval(menuVisible: Bool, idle: Bool) -> TimeInterval? {
+        if idle { return nil }
+        return menuVisible ? visibleRefreshInterval : hiddenRefreshInterval
+    }
     private let undoWindow: TimeInterval = 5.0
 
     /// The popover can close while the pointer is still over the list, and that
@@ -154,23 +184,94 @@ final class PortsStore: ObservableObject {
             .store(in: &cancellables)
 
         refresh()
+        scheduleRefreshTimer()
+        observeUserPresence()
+    }
 
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+    deinit {
+        refreshTimer?.invalidate()
+        for (center, observer) in systemObservers {
+            center.removeObserver(observer)
+        }
+    }
+
+    private func observeUserPresence() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        // Not in the SDK as constants, but posted by loginwindow since 10.x
+        // and what every lock-aware Mac app listens for.
+        let distributed = DistributedNotificationCenter.default()
+
+        let transitions: [(NotificationCenter, Notification.Name, IdleReason, Bool)] = [
+            (workspace, NSWorkspace.screensDidSleepNotification, .screensAsleep, true),
+            (workspace, NSWorkspace.screensDidWakeNotification, .screensAsleep, false),
+            (workspace, NSWorkspace.sessionDidResignActiveNotification, .sessionInactive, true),
+            (workspace, NSWorkspace.sessionDidBecomeActiveNotification, .sessionInactive, false),
+            (distributed, Notification.Name("com.apple.screenIsLocked"), .screenLocked, true),
+            (distributed, Notification.Name("com.apple.screenIsUnlocked"), .screenLocked, false),
+        ]
+        for (center, name, reason, idle) in transitions {
+            let observer = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.setIdle(reason, idle) }
+            }
+            systemObservers.append((center, observer))
+        }
+
+        // Servers started or stopped while asleep: don't show the pre-sleep
+        // list for another full interval. A dark wake (Power Nap) leaves the
+        // screens asleep, so this stays quiet then.
+        let wake = workspace.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.idleReasons.isEmpty else { return }
+                self.refresh()
+            }
+        }
+        systemObservers.append((workspace, wake))
+    }
+
+    private func setIdle(_ reason: IdleReason, _ idle: Bool) {
+        let wasIdle = !idleReasons.isEmpty
+        if idle {
+            idleReasons.insert(reason)
+        } else {
+            idleReasons.remove(reason)
+        }
+        let isIdle = !idleReasons.isEmpty
+        guard wasIdle != isIdle else { return }
+        scheduleRefreshTimer()
+        // Back at the desk: the count may be minutes old.
+        if !isIdle { refresh() }
+    }
+
+    /// Called when the popover opens or closes.
+    func setMenuVisible(_ visible: Bool) {
+        guard visible != isMenuVisible else { return }
+        isMenuVisible = visible
+        scheduleRefreshTimer()
+        // Opening after up to 20 s of slow polling: show fresh data at once.
+        if visible { refresh() }
+    }
+
+    private func scheduleRefreshTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        guard let interval = Self.refreshInterval(menuVisible: isMenuVisible, idle: !idleReasons.isEmpty) else {
+            return
+        }
+        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
                 self.refresh()
             }
         }
-    }
-
-    deinit {
-        refreshTimer?.invalidate()
+        // Let macOS batch our wakeups with others; precision doesn't matter here.
+        timer.tolerance = interval * 0.2
+        refreshTimer = timer
     }
 
     // MARK: - Scanning
 
-    /// - Parameter manual: user-triggered scans show progress; the 3-second
-    ///   background poll must not flicker a spinner every 3 seconds.
+    /// - Parameter manual: user-triggered scans show progress; the background
+    ///   poll must not flicker a spinner on every tick.
     func refresh(manual: Bool = false) {
         if isRefreshing {
             refreshQueued = true
@@ -212,7 +313,7 @@ final class PortsStore: ObservableObject {
             }
 
             let pids = baseListeners.map(\.pid)
-            let infos = await ProcessInfoFetcher.fetchProcessInfo(for: pids)
+            let infos = await ProcessDetailsFetcher.fetch(for: pids)
 
             let rows: [ListenerRow] = baseListeners.map { l in
                 let info = infos[l.pid]

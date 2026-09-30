@@ -61,29 +61,20 @@ struct Actions {
     static func openApp(named app: String, withDirectory cwd: String) throws {
         try requireDirectory(cwd)
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        task.arguments = ["-a", app, cwd]
-
-        let errPipe = Pipe()
-        task.standardOutput = FileHandle.nullDevice
-        task.standardError = errPipe
-
+        let result: Subprocess.Output
         do {
-            try task.run()
+            // Generous: `open` waits for LaunchServices, which can be slow
+            // when the app is launching cold.
+            result = try Subprocess.run("/usr/bin/open", ["-a", app, cwd], timeout: 15)
         } catch {
             throw ActionError.appUnavailable(name: app, reason: error.localizedDescription)
         }
 
-        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-
-        guard task.terminationStatus == 0 else {
-            let message = String(data: errData, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard result.status == 0 else {
+            let message = result.stderrString.trimmingCharacters(in: .whitespacesAndNewlines)
             throw ActionError.appUnavailable(
                 name: app,
-                reason: message.isEmpty ? "open exited with code \(task.terminationStatus)" : message
+                reason: message.isEmpty ? "open exited with code \(result.status)" : message
             )
         }
     }
@@ -321,7 +312,7 @@ struct Actions {
 
     private static let searchPath: [String] = {
         var dirs: [String] = []
-        let env = Foundation.ProcessInfo.processInfo.environment["PATH"] ?? ""
+        let env = ProcessInfo.processInfo.environment["PATH"] ?? ""
         dirs.append(contentsOf: env.split(separator: ":").map(String.init))
         // Menu-bar apps launched from Finder often have a stripped PATH that
         // omits Homebrew; still look there so `node` / `npm` can relaunch.
@@ -362,57 +353,31 @@ struct Actions {
     }
 
     private static func kill(pid: Int, signal: Int32) throws {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/kill")
-        task.arguments = ["-\(signal)", "\(pid)"]
-
-        let errPipe = Pipe()
-        task.standardOutput = FileHandle.nullDevice
-        task.standardError = errPipe
-
+        let result: Subprocess.Output
         do {
-            try task.run()
+            result = try Subprocess.run("/bin/kill", ["-\(signal)", "\(pid)"])
         } catch {
             throw ActionError.stopFailed(pid: pid, reason: error.localizedDescription)
         }
 
-        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-
         // A process that exited between the scan and the signal is a success,
         // not a failure: the user wanted it gone and it is gone.
-        guard task.terminationStatus != 0, isProcessAlive(pid) else { return }
+        guard result.status != 0, isProcessAlive(pid) else { return }
 
-        let message = String(data: errData, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let message = result.stderrString.trimmingCharacters(in: .whitespacesAndNewlines)
         throw ActionError.stopFailed(
             pid: pid,
-            reason: message.isEmpty ? "kill exited with code \(task.terminationStatus)" : message
+            reason: message.isEmpty ? "kill exited with code \(result.status)" : message
         )
     }
 
     private static func kill(processGroup pgid: Int, signal: Int32) throws {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/kill")
         // Negative PID form targets the process group.
-        task.arguments = ["-\(signal)", "-\(pgid)"]
-        task.standardOutput = FileHandle.nullDevice
-        task.standardError = FileHandle.nullDevice
-        try task.run()
-        task.waitUntilExit()
+        _ = try Subprocess.run("/bin/kill", ["-\(signal)", "-\(pgid)"])
     }
 
     private static func isProcessAlive(_ pid: Int) -> Bool {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/kill")
-        task.arguments = ["-0", "\(pid)"]
-        do {
-            try task.run()
-            task.waitUntilExit()
-            return task.terminationStatus == 0
-        } catch {
-            return false
-        }
+        (try? Subprocess.run("/bin/kill", ["-0", "\(pid)"]))?.status == 0
     }
 
     private static func processGroupID(for pid: Int) -> Int? {
@@ -458,20 +423,7 @@ struct Actions {
     }
 
     private static func runCapture(_ path: String, args: [String]) -> String {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: path)
-        task.arguments = args
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch {
-            return ""
-        }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8) ?? ""
+        (try? Subprocess.run(path, args))?.stdoutString ?? ""
     }
 
     private static func appleScriptEscape(_ s: String) -> String {

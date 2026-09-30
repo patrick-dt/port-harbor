@@ -105,9 +105,14 @@ enum FrameworkIconResources {
     }
 
     static func url(named name: String, extension ext: String) -> URL? {
-        Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "FrameworkIcons")
+        // The packaged .app carries a flat copy in Contents/Resources. Check it
+        // first: `Bundle.module` falls back to an absolute `.build` path and
+        // traps when that is gone, which would crash the installed app.
+        if Bundle.main.bundleURL.pathExtension == "app" {
+            return Bundle.main.url(forResource: name, withExtension: ext, subdirectory: "FrameworkIcons")
+                ?? Bundle.main.url(forResource: name, withExtension: ext)
+        }
+        return Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "FrameworkIcons")
             ?? Bundle.module.url(forResource: name, withExtension: ext)
-            ?? Bundle.main.url(forResource: name, withExtension: ext, subdirectory: "FrameworkIcons")
-            ?? Bundle.main.url(forResource: name, withExtension: ext)
     }
 }

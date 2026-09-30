@@ -73,20 +73,12 @@ mkdir -p "$MACOS" "$RESOURCES"
 cp "$BINARY" "$MACOS/$BINARY_NAME"
 chmod +x "$MACOS/$BINARY_NAME"
 
-# SPM resource bundles (FrameworkIcons, etc.) live next to the built binary.
-BIN_DIR="$(dirname "$BINARY")"
-shopt -s nullglob
-RESOURCE_BUNDLES=("$BIN_DIR"/*.bundle)
-if ((${#RESOURCE_BUNDLES[@]})); then
-  cp -R "${RESOURCE_BUNDLES[@]}" "$MACOS/"
-  echo "Resources: copied ${#RESOURCE_BUNDLES[@]} SwiftPM bundle(s) next to the executable"
-fi
-# Flat copy for Bundle.main fallback (packaged .app).
+# The packaged app reads resources from Bundle.main (see FrameworkIcons.url).
+# SwiftPM's .bundle is not copied: codesign rejects it inside Contents/MacOS.
 if [[ -d "$ROOT/Sources/PortHarbor/Resources/FrameworkIcons" ]]; then
   mkdir -p "$RESOURCES/FrameworkIcons"
   cp -R "$ROOT/Sources/PortHarbor/Resources/FrameworkIcons/." "$RESOURCES/FrameworkIcons/"
 fi
-shopt -u nullglob
 
 HAS_ICON=0
 if [[ -f "$SOURCE_ICON" ]]; then

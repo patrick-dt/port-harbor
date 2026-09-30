@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A hung `lsof` (e.g. on an unreachable network volume) no longer stalls scanning forever without notice: every system tool call now has a deadline, and a scan that times out is reported like any other failed scan.
+- Reading `ps`/`lsof` output after waiting for exit could deadlock once the output exceeded a pipe buffer; all tool calls now drain output while the tool runs.
+- `package-app.sh` no longer copies the SwiftPM resource bundle into `Contents/MacOS`, where `codesign` rejected it and aborted the install.
+- The packaged app loads framework marks from its own `Contents/Resources` instead of `Bundle.module`, which traps once the `.build` folder is gone.
 - Open IPv4-only listeners at `http://127.0.0.1:<port>` instead of `localhost`, so a sibling bound to `::1` is not opened by mistake.
 - IPv4-only rows show `127.0.0.1` next to the port so two processes sharing a port are distinguishable.
 - Wrap `containerBackground(..., for: .window)` in `compiler(>=6.0)` so Xcode 15 SDKs still compile.
@@ -27,11 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Scan every 20 seconds while the popover is closed (3 seconds while open, immediately on open and after wake), and not at all while the display sleeps, the screen is locked or another user is switched in, so Port Harbor is cheap to keep running as a login item.
+- Command lines for all listeners come from one batched `ps` call instead of one per process.
+- Split `PortsMenu` into `ListenerCard`, `MenuFooter`, `IgnoredProcessesList` and shared window chrome; renamed `ProcessInfo` to `ProcessDetails` so it no longer shadows `Foundation.ProcessInfo`.
 - Stop waits ~0.7s after SIGTERM and, when the listener is its process-group leader, also signals the group before escalating to SIGKILL.
 - `package-app.sh` sets `CFBundleShortVersionString` from the latest `v*` git tag (override with `PORT_HARBOR_VERSION`).
 
 ### Added
 
+- The menu bar icon turns into a warning sign while the last scan failed, so a stale count is not mistaken for a live one.
+- “At login” toggle in the footer registers the installed app as a login item (`SMAppService`), so Port Harbor starts with macOS.
 - Double-click `Open Port Harbor.command` to launch the menu bar app without Xcode.
 - Colored framework badges: Astro and Next.js as SwiftUI vector marks (plus `.svg` sources); Sanity as bundled PNG; other frameworks keep monogram tiles.
 - Sanity Studio detection (`sanity` / `@sanity` in the command line).

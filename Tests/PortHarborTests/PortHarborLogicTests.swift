@@ -224,6 +224,21 @@ final class ScanFreezePolicyTests: XCTestCase {
     }
 }
 
+final class RefreshIntervalPolicyTests: XCTestCase {
+    func testFastWhileMenuOpen() {
+        XCTAssertEqual(PortsStore.refreshInterval(menuVisible: true, idle: false), PortsStore.visibleRefreshInterval)
+    }
+
+    func testSlowWhileMenuClosed() {
+        XCTAssertEqual(PortsStore.refreshInterval(menuVisible: false, idle: false), PortsStore.hiddenRefreshInterval)
+    }
+
+    func testNoPollingWhileNobodyIsThere() {
+        XCTAssertNil(PortsStore.refreshInterval(menuVisible: false, idle: true))
+        XCTAssertNil(PortsStore.refreshInterval(menuVisible: true, idle: true))
+    }
+}
+
 final class FrameworkDetectionTests: XCTestCase {
     func testDetectsSanityStudio() {
         XCTAssertEqual(

@@ -14,6 +14,8 @@ Needs macOS 13+ and the Swift toolchain. Command Line Tools are enough to run th
 
 **From Finder:** double-click `Open Port Harbor.command`. The first time it builds and installs `/Applications/Port Harbor.app`; after that it just launches the menu bar app (no Dock icon).
 
+To have it start with macOS, open the menu and turn on **At login** in the footer.
+
 Or from a terminal:
 
 ```sh
@@ -26,13 +28,13 @@ That builds a release `.app` and copies it to `/Applications/Port Harbor.app`. R
 
 ## Features
 
-- **Auto-discovery** — scans localhost-reachable TCP listeners via `lsof` every 3 seconds
+- **Auto-discovery** — scans localhost-reachable TCP listeners via `lsof` every 3 seconds while the list is open, every 20 seconds while it is closed, and not at all while the display is asleep, the screen is locked, or another user is active
 - **Framework detection** — Next.js, Vite, Nuxt, Astro, Sanity, Django, Rails, Flask, and 15+ more, with colored badges in the list
 - **Quick actions** — open in browser, Cursor, or Terminal; restart or stop any server
 - **Undo for Stop** — a stopped server stays listed for 5 seconds with an Undo that reruns its command
 - **Ignore list** — hide apps that merely hold a local port (Raycast, Spotify, …); persisted in `UserDefaults`
 - **Keyboard** — `⌘1`–`⌘9` open the first nine servers, `⌘R` rescans, `⌘Q` quits
-- **Zero config** — no setup, no background daemon, just a menu bar icon (with a live listener count)
+- **Zero config** — no setup, no background daemon, just a menu bar icon (with a live listener count; it turns into a warning sign when a scan fails)
 
 ## Building
 

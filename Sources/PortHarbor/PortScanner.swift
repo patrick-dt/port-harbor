@@ -90,6 +90,7 @@ enum PortScannerError: LocalizedError {
     case lsofMissing(path: String)
     case lsofFailed(exitCode: Int32, message: String)
     case lsofUnlaunchable(reason: String)
+    case lsofTimedOut(seconds: TimeInterval)
 
     var errorDescription: String? {
         switch self {
@@ -101,6 +102,8 @@ enum PortScannerError: LocalizedError {
                 : "lsof failed (exit \(code)): \(message)"
         case .lsofUnlaunchable(let reason):
             return "Could not run lsof: \(reason)"
+        case .lsofTimedOut(let seconds):
+            return "lsof gave no answer within \(Int(seconds.rounded())) seconds (often an unreachable network volume)."
         }
     }
 
@@ -113,6 +116,10 @@ struct PortScanner {
 
     // -F pcnLP => machine-readable fields: pid/command/name/login/proto
     private static let arguments = ["-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcnLP"]
+
+    /// lsof normally answers in well under a second. Past this, give up and
+    /// report it, so the next scan can try again instead of queueing forever.
+    private static let timeout: TimeInterval = 8
 
     static var commandLine: String {
         ([lsofPath] + arguments).joined(separator: " ")
@@ -134,34 +141,26 @@ struct PortScanner {
             throw PortScannerError.lsofMissing(path: lsofPath)
         }
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: lsofPath)
-        task.arguments = arguments
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = pipe
-
+        let result: Subprocess.Output
         do {
-            try task.run()
+            result = try Subprocess.run(lsofPath, arguments, timeout: timeout)
+        } catch Subprocess.Failure.timedOut(let seconds) {
+            throw PortScannerError.lsofTimedOut(seconds: seconds)
         } catch {
             throw PortScannerError.lsofUnlaunchable(reason: error.localizedDescription)
         }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-
-        let output = String(data: data, encoding: .utf8) ?? ""
-        let listeners = LsofFParser.parse(output: output)
+        let listeners = LsofFParser.parse(output: result.stdoutString)
 
         // lsof exits non-zero both when it finds nothing and when it hits a real
         // problem, and it keeps emitting records while warning about individual
         // processes it may not inspect. Only treat it as a failure when we got
         // no usable records *and* it had something to say.
-        if task.terminationStatus != 0, listeners.isEmpty, !output.isEmpty {
+        let diagnostics = result.stderrString + result.stdoutString
+        if result.status != 0, listeners.isEmpty, !diagnostics.isEmpty {
             throw PortScannerError.lsofFailed(
-                exitCode: task.terminationStatus,
-                message: firstDiagnosticLine(in: output)
+                exitCode: result.status,
+                message: firstDiagnosticLine(in: diagnostics)
             )
         }
 
